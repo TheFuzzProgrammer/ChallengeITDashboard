@@ -2,9 +2,9 @@ __author__ = 'Fuzz'
 
 import sys
 from time import sleep
-from file_handler import *
 from RPA.Browser.Selenium import webdriver
 from selenium.common.exceptions import *
+from RPA.Excel.Files import *
 
 
 def main(args=None):
@@ -39,7 +39,7 @@ def main(args=None):
             exit(2)
         else:
             path = 'output\investment' + str(matrix[0][0]) + '.xlsx'
-            save_to_excel(matrix)
+            save_to_excel(matrix, path)
     info = Elements(links, view_data)
     info.investments_matrix = matrix
     info.show_data_as_string()
@@ -51,6 +51,7 @@ def all_to_excel_file(matrix, path=None):
     for table in range(0, len(matrix)):
         save_to_excel(matrix[table], path)
     return 0
+
 
 class Elements(object):
     """ contains elements from driver, an instance need:
@@ -85,7 +86,7 @@ class Elements(object):
         return 0
 
 
-def get_info_from_driver(driver, param, selector, attr='href'):
+def get_info_from_driver(driver, param, selector_var, attr='href'):
     """Receives 4 parameters, the web driver, the str to use for search (link text)
     and a selector for select strings or elements on the return.
     :returns a list with strings
@@ -94,7 +95,7 @@ def get_info_from_driver(driver, param, selector, attr='href'):
     elements_found = driver.find_elements_by_partial_link_text(str(param))
     output = []
     for element in elements_found:
-        if selector == 's':
+        if selector_var == 's':
             try:
                 output.append(str(element.get_attribute(str(attr))))
             except AttributeError:
@@ -140,8 +141,7 @@ def get_driver(browser, url):
 
 
 def get_investments_table(driver, rows, cols):
-    investments_matrix = [[''] * cols for i in range(rows)]
-    aux_col = aux_row = 1
+    investments_matrix = [[''] * cols for _ in range(rows)]
     elements = driver.find_elements_by_xpath('//*[@id="investments-table-object"]/tbody/tr')
     for element in range(0, len(elements)):
         investments_matrix[element][0] = elements[element].find_elements_by_tag_name('td')[0].text
@@ -185,8 +185,7 @@ def selector(driver):
     selector_found = False
     while not selector_found:
         try:
-            selector = driver.find_element_by_xpath("//select[@name='investments-table-object_length']")
-            selector.send_keys('a')
+            driver.find_element_by_xpath("//select[@name='investments-table-object_length']").send_keys('a')
             selector_found = True
         except:
             continue
@@ -247,15 +246,4 @@ def save_to_excel(table, path=None, exists=False):
 
 
 if __name__ == '__main__':
-    print(sys.argv)
-    if len(sys.argv) != 2:
-        print('No argument setted, or its invalid\n '
-              'WORKING WITH ARGUMENTS:\n<this script> "argument of execution" on terminal'
-              'Without argument, it will take data from ALL the sources, continue? Y/N')
-        option = input().upper()
-        if option == 'Y':
-            main()
-        else:
-            exit(1)
-    else:
-        main(sys.argv[1])
+    main('Agency')
