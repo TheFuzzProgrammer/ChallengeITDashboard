@@ -1,148 +1,34 @@
 __author__ = 'Fuzz'
 
-import sys
 from time import sleep
-from RPA.Browser.Selenium import webdriver
-from selenium.common.exceptions import *
+from SeleniumLibrary.errors import *
+from RPA.Browser.Selenium import Selenium
 from RPA.Excel.Files import *
+from RPA.PDF import PDF
 
 
-def main(args=None):
+def main():
     """
     RPA CHALLENGE main MODULE
-    uses:
-    >>$ python main.py 'agency that need'
-    END CODES:
-    0 all was fine
-    1 you don't send parameters and decided to exit
-    2 It couldn't found the agency
     """
     # Get Web driver space
-    driver = get_driver('Chrome', 'https://itdashboard.gov/')
-    sleep(5)
-    # Get first button
-    dive_in_button = driver.find_element_by_link_text('DIVE IN')
-    dive_in_button.click()
-    # Get view buttons
-    view_buttons = driver.find_elements_by_link_text('view')
-    view_data = get_info_from_driver(driver, '$', 's', 'text')
-    links = get_urls(view_buttons)
-
-    if args is None:
-        matrix = get_all_from_driver(links, driver)
-        path = 'output\investment' + str(matrix[0][0][0]) + '.xlsx'
-        all_to_excel_file(matrix, path)
-    else:
-        matrix = get_from_agency_page(driver, args)
-        if matrix == 0:
-            print('Agency not found')
-            exit(2)
-        else:
-            path = 'output\investment' + str(matrix[0][0]) + '.xlsx'
-            save_to_excel(matrix, path)
-    info = Elements(links, view_data)
-    info.investments_matrix = matrix
-    info.show_data_as_string()
-    info.show_link_as_string()
-    driver.close()
-
-
-def all_to_excel_file(matrix, path=None):
-    for table in range(0, len(matrix)):
-        save_to_excel(matrix[table], path)
-    return 0
-
-
-class Elements(object):
-    """ contains elements from driver, an instance need:
-        a list of links, and a list of data, use it as you need
-    """
-
-    def __init__(self, links=None, data=None):
-        super().__init__()
-        if links is None:
-            links = []
-        if data is None:
-            data = []
-        self._is_link = links
-        self._is_data = data
-        self.investments_matrix = []
-        self.business_cases_urls = []
-
-    def show_link_as_string(self):
-        for element in self._is_link:
-            if type(element) == str:
-                print(element)
-            else:
-                print(str(element.get_attribute('text')) + '\n')
-        return 0
-
-    def show_data_as_string(self):
-        for element in self._is_data:
-            if type(element) == str:
-                print(element)
-            else:
-                print(str(element.get_attribute('text')) + '\n')
-        return 0
-
-
-def get_info_from_driver(driver, param, selector_var, attr='href'):
-    """Receives 4 parameters, the web driver, the str to use for search (link text)
-    and a selector for select strings or elements on the return.
-    :returns a list with strings
-    """
+    driver = get_driver('https://itdashboard.gov/')
     sleep(3)
-    elements_found = driver.find_elements_by_partial_link_text(str(param))
-    output = []
-    for element in elements_found:
-        if selector_var == 's':
-            try:
-                output.append(str(element.get_attribute(str(attr))))
-            except AttributeError:
-                print('There is not elements with ', str(attr), ' as attribute')
-            finally:
-                if element == elements_found[-1]:
-                    return output
-        else:
-            output.append(element)
-            if element == elements_found[-1]:
-                return output
+    driver.click_element('//*[@id="node-23"]/div/div/div/div/div/div/div/a')
+    agency_name = get_agency()
+    table = get_from_agency_page(driver, agency_name)
+    save_to_excel(table, 'output\info_from_'+agency_name+'.xlsx')
 
 
-def get_all_from_driver(links, driver):
-    tables = []
-    for link in range(0, len(links)):
-        print(link, ' OF ', len(links))
-        driver.get(links[link])
-        selector(driver)
-        rows = len(driver.find_elements_by_xpath('//*[@id="investments-table-object"]/tbody/tr'))
-        while rows == 10:
-            rows = len(driver.find_elements_by_xpath('//*[@id="investments-table-object"]/tbody/tr'))
-        cols = len(driver.find_elements_by_xpath('//*[@id="investments-table-object"]/tbody/tr[1]/td'))
-        table = get_investments_table(driver, rows, cols)
-        get_pdf(driver, get_investment_id(table[0][0]))
-        tables.append(table)
-
-    return list(tables)
-
-
-def get_urls(web_elements_array):
-    urls_array = []
-    for x in web_elements_array:
-        urls_array.append(x.get_attribute('href'))
-    urls_array = set(urls_array)
-    return list(urls_array)
-
-
-def get_driver(browser, url):
-    web_driver = webdriver.start(str(browser))
-    web_driver.get(str(url))
+def get_driver(url):
+    web_driver = Selenium()
+    web_driver.open_available_browser(url)
     return web_driver
 
 
 def get_investments_table(driver, rows, cols):
     investments_matrix = [[''] * cols for _ in range(rows)]
-    elements = driver.find_elements_by_xpath('//*[@id="investments-table-object"]/tbody/tr')
+    elements = driver.get_webelements('//*[@id="investments-table-object"]/tbody/tr')
     for element in range(0, len(elements)):
         investments_matrix[element][0] = elements[element].find_elements_by_tag_name('td')[0].text
         investments_matrix[element][1] = elements[element].find_elements_by_tag_name('td')[1].text
@@ -165,18 +51,18 @@ def get_investment_id(string):
             string_id += string[x]
 
 
-def get_pdf(driver, investment_id):
-    urls = get_urls(driver.find_elements_by_partial_link_text(investment_id))
+def get_pdf(driver, rows):
+    urls = get_urls(driver, rows)
     for x in urls:
-        driver.get(x)
+        driver.go_to(x)
         button_found = False
         while not button_found:
             try:
-                pdf = driver.find_element_by_partial_link_text('PDF')
+                pdf = driver.get_webelement('//*[@id="business-case-pdf"]/a')
                 pdf.click()
                 button_found = True
                 sleep(5)
-            except NoSuchElementException:
+            except ElementNotFound:
                 pass
     return 0
 
@@ -185,33 +71,44 @@ def selector(driver):
     selector_found = False
     while not selector_found:
         try:
-            driver.find_element_by_xpath("//select[@name='investments-table-object_length']").send_keys('a')
+            driver.get_webelement("//select[@name='investments-table-object_length']").send_keys('a')
             selector_found = True
-        except:
-            continue
+        except ElementNotFound:
+            pass
 
 
-def get_from_agency_page(driver, string):
-    axis_y = len(driver.find_elements_by_xpath('//*[@id="agency-tiles-widget"]/div/div'))
-    axys_x = len(driver.find_elements_by_xpath('//*[@id="agency-tiles-widget"]/div/div[1]/div'))
+def get_urls(driver, rows):
+    urls_array = []
+    for x in range(1, rows+1):
+        try:
+            web_element = driver.get_webelement('//*[@id="investments-table-object"]/tbody/tr[' + str(x) + ']/td/a')
+            urls_array.append(web_element.get_attribute('href'))
+        except ElementNotFound:
+            pass
 
-    for row in range(1, axis_y+1):
-        for column in range(1, axys_x+1):
-            agency = driver.find_element_by_xpath(
-                '//*[@id="agency-tiles-widget"]/div/div['+str(row)+']/div['+str(column)+']')
-            if string.upper() in agency.text.upper():
-                agency.click()
+    return urls_array
+
+
+def get_from_agency_page(driver, agency):
+    axis_y = len(driver.get_webelements('//*[@id="agency-tiles-widget"]/div/div'))
+    axis_x = len(driver.get_webelements('//*[@id="agency-tiles-widget"]/div/div[1]/div'))
+    for row in range(1, axis_y + 1):
+        for column in range(1, axis_x + 1):
+            agency_found = driver.get_webelement(
+                '//*[@id="agency-tiles-widget"]/div/div[' + str(row) + ']/div[' + str(column) + ']')
+            if agency.upper() in agency_found.text.upper():
+                agency_found.click()
                 selector(driver)
-                rows = len(driver.find_elements_by_xpath('//*[@id="investments-table-object"]/tbody/tr'))
+                rows = len(driver.get_webelements('//*[@id="investments-table-object"]/tbody/tr'))
                 while rows == 10:
-                    rows = len(driver.find_elements_by_xpath('//*[@id="investments-table-object"]/tbody/tr'))
-                cols = len(driver.find_elements_by_xpath('//*[@id="investments-table-object"]/tbody/tr[1]/td'))
+                    rows = len(driver.get_webelements('//*[@id="investments-table-object"]/tbody/tr'))
+                cols = len(driver.get_webelements('//*[@id="investments-table-object"]/tbody/tr[1]/td'))
                 table = get_investments_table(driver, rows, cols)
-                get_pdf(driver, get_investment_id(table[0][0]))
+                get_pdf(driver, rows)
                 return table
             else:
                 pass
-        return 0
+    return 0
 
 
 def read_excel_worksheet(path, worksheet):
@@ -245,5 +142,21 @@ def save_to_excel(table, path=None, exists=False):
     return 0
 
 
+def get_agency():
+    data = open('source.txt', 'r')
+    agency = data.read()
+    data.close()
+    return str(agency)
+
+
+def compare_pdf(path, investment_id):
+    pdf = PDF()
+    text = str(pdf.get_text_from_pdf(path, '1'))
+    if investment_id in text:
+        return True
+    else:
+        return False
+
+
 if __name__ == '__main__':
-    main('Agency')
+    main()
